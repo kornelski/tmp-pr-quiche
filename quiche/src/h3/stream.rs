@@ -692,6 +692,20 @@ impl Stream {
         self.state_off == self.state_len
     }
 
+    /// Returns true if there is incomplete data in the state buffer.
+    /// This indicates that a frame was being parsed when the stream was closed.
+    pub fn has_incomplete_frame(&self) -> bool {
+        match self.state {
+            // FrameType state with incomplete buffer is normal (waiting for next frame)
+            State::FrameType => false,
+            // FramePayloadLen and FramePayload states with incomplete buffer are errors
+            State::FramePayloadLen | State::FramePayload => {
+                !self.state_buffer_complete()
+            },
+            _ => false,
+        }
+    }
+
     /// Transitions the stream to a new state, and optionally resets the state
     /// buffer.
     fn state_transition(

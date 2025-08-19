@@ -1808,7 +1808,7 @@ impl Connection {
         // While body is being received, the stream is marked as finished only
         // when all data is read by the application.
         if conn.stream_finished(stream_id) {
-            self.process_finished_stream(stream_id);
+            self.process_finished_stream(stream_id)?;
         }
 
         if total == 0 {
@@ -2045,7 +2045,7 @@ impl Connection {
             };
 
             if conn.stream_finished(s) {
-                self.process_finished_stream(s);
+                self.process_finished_stream(s)?;
             }
 
             // TODO: check if stream is completed so it can be freed
@@ -2792,15 +2792,21 @@ impl Connection {
         Err(Error::Done)
     }
 
-    fn process_finished_stream(&mut self, stream_id: u64) {
+    fn process_finished_stream(&mut self, stream_id: u64) -> Result<()> {
         let stream = match self.streams.get_mut(&stream_id) {
             Some(v) => v,
 
-            None => return,
+            None => return Ok(()),
         };
 
         if stream.state() == stream::State::Finished {
-            return;
+            return Ok(());
+        }
+
+        // Check if the stream was closed while parsing an incomplete frame
+        if stream.has_incomplete_frame() {
+            // Stream was closed with incomplete frame data - this is a protocol error
+            return Err(Error::FrameError);
         }
 
         match stream.ty() {
@@ -2812,6 +2818,8 @@ impl Connection {
 
             _ => (),
         };
+
+        Ok(())
     }
 
     fn process_frame<F: BufFactory>(
@@ -3586,6 +3594,29 @@ mod tests {
     /// Make sure that random GREASE values is within the specified limit.
     fn grease_value_in_varint_limit() {
         assert!(grease_value() < 2u64.pow(62) - 1);
+    }
+
+    #[test]
+    /// Tests that sending a truncated frame causes an error.
+    fn truncated_frame() {
+        let mut s = Session::new().unwrap();
+        s.handshake().unwrap();
+
+        let mut d = [42; 128];
+        let mut b = octets::OctetsMut::with_slice(&mut d);
+
+        let frame_type = b.put_varint(frame::HEADERS_FRAME_TYPE_ID).unwrap();
+        s.pipe.client.stream_send(0, frame_type, false).unwrap();
+
+        let frame_len = b.put_varint(500).unwrap();
+        s.pipe.client.stream_send(0, frame_len, false).unwrap();
+
+        s.pipe.client.stream_send(0, b"", true).unwrap();
+
+        s.advance().ok();
+
+        // This should fail after fix - stream closed with incomplete frame
+        assert_eq!(s.server.poll(&mut s.pipe.server), Err(Error::FrameError));
     }
 
     #[cfg(not(feature = "openssl"))] // 0-RTT not supported when using openssl/quictls
