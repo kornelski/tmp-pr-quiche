@@ -23,7 +23,7 @@ jobs:
       matrix:
         targets: [
           ["aarch64-unknown-linux-gnu", "arm64", "aarch64"],
-          ["i686-unknown-linux-gnu", "i386", "i686"],
+          # ["i686-unknown-linux-gnu", "i386", "i686"],
         ]
     # Only run on "pull_request" event for external PRs. This is to avoid
     # duplicate builds for PRs created from internal branches.
