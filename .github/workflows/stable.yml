@@ -240,7 +240,7 @@ jobs:
           sudo apt-get update || true
 
           # Github's Ubuntu image has some heavy packages that cause an avalanche of difficult upgrades
-          sudo apt-get remove -y --purge php8.3 firefox google-chrome-stable llvm-18 clang-18 || true
+          sudo apt-get remove -y --purge php8.3 firefox google-chrome-stable llvm-16 llvm-17 llvm-18 clang-16 clang-17 clang-18 libclang1-18 || true
           # force-overwrite is for a bad llvm package that has a conflicting non-multiarch path
           # libxml2 is not needed for this build, but something else llvm-dependent needs it, and apt won't proceed without it
           sudo apt-get -y --no-install-recommends -o Dpkg::Options::="--force-overwrite" \
