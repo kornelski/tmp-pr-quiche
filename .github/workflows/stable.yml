@@ -60,6 +60,7 @@ jobs:
             install crossbuild-essential-${{ matrix.targets[1] }} libxml2:${{ matrix.targets[1] }} libclang-dev:${{ matrix.targets[1] }}
 
           # Configure cmake
+          echo >> $GITHUB_ENV LIBCLANG_PATH=/usr/lib/${{ matrix.targets[2] }}-linux-gnu/
           echo >> $GITHUB_ENV CC=/usr/bin/${{ matrix.targets[2] }}-linux-gnu-gcc
           echo >> $GITHUB_ENV CXX=/usr/bin/${{ matrix.targets[2] }}-linux-gnu-g++
           echo >> $GITHUB_ENV CARGO_TARGET_$(echo ${{ matrix.targets[0] }} | tr '[:lower:]-' '[:upper:]_')_LINKER=/usr/bin/${{ matrix.targets[2] }}-linux-gnu-gcc
