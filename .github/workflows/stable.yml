@@ -42,25 +42,26 @@ jobs:
 
       - name: Debian cross setup ${{ matrix.targets[1] }}
         run: |
-          sudo dpkg --add-architecture ${{ matrix.targets[1] }}
-          # In Ubuntu only ports have packages for other architectures
-          THE_ANIMAL_DJ=$(lsb_release -sc)
-          echo "
-          deb [arch=${{ matrix.targets[1] }}] http://ports.ubuntu.com/ubuntu-ports/ ${THE_ANIMAL_DJ} main restricted universe multiverse
-          deb [arch=${{ matrix.targets[1] }}] http://ports.ubuntu.com/ubuntu-ports/ ${THE_ANIMAL_DJ}-updates main restricted universe multiverse
-          deb [arch=${{ matrix.targets[1] }}] http://ports.ubuntu.com/ubuntu-ports/ ${THE_ANIMAL_DJ}-security main restricted universe multiverse
-          " | sudo tee /etc/apt/sources.list.d/cross-${{ matrix.targets[1] }}.list
-          sudo apt-get update || true
+          QEMU_PACKAGES=""
+          if [[ "${{ matrix.targets[1] }}" != "i386" ]]; then
+            QEMU_PACKAGES="qemu-user libc6:${{ matrix.targets[1] }}"
 
-          # Github's Ubuntu image has some heavy packages that cause an avalanche of difficult upgrades
-          sudo apt-get remove -y --purge php8.3 firefox google-chrome-stable llvm-16 llvm-17 llvm-18 clang-16 clang-17 clang-18 libclang1-18 || true
-          # force-overwrite is for a bad llvm package that has a conflicting non-multiarch path
-          # libxml2 is not needed for this build, but something else llvm-dependent needs it, and apt won't proceed without it
-          sudo apt-get -y --no-install-recommends -o Dpkg::Options::="--force-overwrite" \
-            install crossbuild-essential-${{ matrix.targets[1] }} libxml2:${{ matrix.targets[1] }} libclang-dev:${{ matrix.targets[1] }}
+            sudo dpkg --add-architecture ${{ matrix.targets[1] }}
+            # In Ubuntu only ports have packages for other architectures
+            THE_ANIMAL_DJ=$(lsb_release -sc)
+            echo "
+            deb [arch=${{ matrix.targets[1] }}] http://ports.ubuntu.com/ubuntu-ports/ ${THE_ANIMAL_DJ} main restricted universe multiverse
+            deb [arch=${{ matrix.targets[1] }}] http://ports.ubuntu.com/ubuntu-ports/ ${THE_ANIMAL_DJ}-updates main restricted universe multiverse
+            deb [arch=${{ matrix.targets[1] }}] http://ports.ubuntu.com/ubuntu-ports/ ${THE_ANIMAL_DJ}-security main restricted universe multiverse
+            " | sudo tee /etc/apt/sources.list.d/cross-${{ matrix.targets[1] }}.list
+            sudo apt-get update || true
+
+            echo >> $GITHUB_ENV CARGO_TARGET_$(echo ${{ matrix.targets[0] }} | tr '[:lower:]-' '[:upper:]_')_RUNNER=qemu-${{ matrix.targets[2] }}
+          fi
+
+          sudo apt-get -y --no-install-recommends install crossbuild-essential-${{ matrix.targets[1] }} libclang-dev $QEMU_PACKAGES
 
           # Configure cmake
-          echo >> $GITHUB_ENV LIBCLANG_PATH=/usr/lib/${{ matrix.targets[2] }}-linux-gnu/
           echo >> $GITHUB_ENV CC=/usr/bin/${{ matrix.targets[2] }}-linux-gnu-gcc
           echo >> $GITHUB_ENV CXX=/usr/bin/${{ matrix.targets[2] }}-linux-gnu-g++
           echo >> $GITHUB_ENV CARGO_TARGET_$(echo ${{ matrix.targets[0] }} | tr '[:lower:]-' '[:upper:]_')_LINKER=/usr/bin/${{ matrix.targets[2] }}-linux-gnu-gcc
